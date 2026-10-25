@@ -37,10 +37,12 @@ class MainActivity : AppCompatActivity() {
                 override fun shouldInterceptRequest(
                     view: WebView?,
                     request: WebResourceRequest?
-                ): WebResourceResponse? = assetLoader.shouldInterceptRequest(request?.url)
+                ): WebResourceResponse? {
+                    val url = request?.url ?: return null
+                    return assetLoader.shouldInterceptRequest(url)
+                }
             }
 
-            // GANTI URL INI dengan game 3D Anda
             loadUrl("https://pbmobile.app")
         }
 
