@@ -9,15 +9,13 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.appcompat.app.AppCompatActivity
-import androidx.webkit.WebViewAssetLoader
-import androidx.webkit.WebViewAssetLoader.AssetsPathHandler
 
 class MainActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 1. Sembunyikan Status Bar & Navigation Bar untuk Layar Penuh (Immersive)
+        // Fullscreen Immersive Mode
         window.decorView.systemUiVisibility = (
             View.SYSTEM_UI_FLAG_LAYOUT_STABLE
             or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
@@ -28,21 +26,14 @@ class MainActivity : AppCompatActivity() {
         )
 
         val webView = WebView(this).apply {
-            // 2. Paksa akselerasi hardware
             setLayerType(View.LAYER_TYPE_HARDWARE, null)
 
             settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true
-                allowFileAccess = true
-                allowContentAccess = true
-                
-                // 3. MATIKAN ZOOM agar koordinat sentuhan/aim akurat
+                cacheMode = android.webkit.WebSettings.LOAD_CACHE_ELSE_NETWORK
                 setSupportZoom(false)
                 builtInZoomControls = false
-                displayZoomControls = false
-                
-                // 4. Biarkan game menyesuaikan rasionya sendiri
                 loadWithOverviewMode = true
                 useWideViewPort = true
             }
@@ -51,34 +42,59 @@ class MainActivity : AppCompatActivity() {
                 setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false)
             }
 
-            val assetLoader = WebViewAssetLoader.Builder()
-                .addPathHandler("/assets/", AssetsPathHandler(this@MainActivity))
-                .build()
-
             webViewClient = object : WebViewClient() {
-                override fun shouldInterceptRequest(
-                    view: WebView?,
-                    request: WebResourceRequest?
-                ): WebResourceResponse? {
-                    val url = request?.url ?: return null
-                    return assetLoader.shouldInterceptRequest(url)
+                override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                    super.onPageStarted(view, url, favicon)
+                    // Trik devicePixelRatio untuk meringankan GPU
+                    val hackScript = """
+                        (function() {
+                            try {
+                                Object.defineProperty(window, 'devicePixelRatio', {
+                                    get: function() { return 1; }
+                                });
+                            } catch(e) {}
+                        })();
+                    """.trimIndent()
+                    view?.evaluateJavascript(hackScript, null)
                 }
 
                 override fun onPageFinished(view: WebView?, url: String?) {
                     super.onPageFinished(view, url)
-                    // 5. Suntikkan JS untuk memicu resize agar game menyesuaikan layar
-                    val js = """
+                    
+                    // Script untuk memunculkan FPS Counter dan memicu resize
+                    val fpsScript = """
                         setTimeout(function() {
                             window.dispatchEvent(new Event('resize'));
-                            if(document.documentElement) {
-                                document.documentElement.style.height = '100vh';
-                                document.body.style.height = '100vh';
-                                document.body.style.margin = '0';
-                                document.body.style.overflow = 'hidden';
+                            
+                            // --- MULAI SCRIPT FPS COUNTER ---
+                            if (!document.getElementById('fps-counter-overlay')) {
+                                var div = document.createElement('div');
+                                div.id = 'fps-counter-overlay';
+                                // Styling: Pojok kanan atas, hijau, menembus sentuhan (pointer-events: none)
+                                div.style.cssText = 'position:fixed; top:10px; right:10px; z-index:999999; color:#00FF00; font-family:monospace; font-size:20px; font-weight:bold; text-shadow:1px 1px 2px black; pointer-events:none; background:rgba(0,0,0,0.5); padding:4px 8px; border-radius:4px;';
+                                div.innerText = 'FPS: ...';
+                                document.body.appendChild(div);
+
+                                var lastTime = performance.now();
+                                var frames = 0;
+                                
+                                function updateFps() {
+                                    var now = performance.now();
+                                    frames++;
+                                    if (now - lastTime >= 1000) {
+                                        var fps = Math.round((frames * 1000) / (now - lastTime));
+                                        div.innerText = 'FPS: ' + fps;
+                                        frames = 0;
+                                        lastTime = now;
+                                    }
+                                    requestAnimationFrame(updateFps);
+                                }
+                                requestAnimationFrame(updateFps);
                             }
-                        }, 1000);
+                            // --- AKHIR SCRIPT FPS COUNTER ---
+                        }, 1500);
                     """.trimIndent()
-                    view?.evaluateJavascript(js, null)
+                    view?.evaluateJavascript(fpsScript, null)
                 }
             }
 
