@@ -17,8 +17,18 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // 1. Sembunyikan Status Bar & Navigation Bar untuk Layar Penuh (Immersive)
+        window.decorView.systemUiVisibility = (
+            View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+            or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+            or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+            or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+            or View.SYSTEM_UI_FLAG_FULLSCREEN
+            or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+        )
+
         val webView = WebView(this).apply {
-            // 1. Paksa akselerasi hardware paling dasar (lapisan GPU)
+            // 2. Paksa akselerasi hardware
             setLayerType(View.LAYER_TYPE_HARDWARE, null)
 
             settings.apply {
@@ -26,18 +36,17 @@ class MainActivity : AppCompatActivity() {
                 domStorageEnabled = true
                 allowFileAccess = true
                 allowContentAccess = true
-
-                // 2. Matikan pembatasan zoom & viewport agar kita bisa atur resolusi
-                setUseWideViewPort(true)
-                setLoadWithOverviewMode(true)
-                // 3. Paksa render pada ~75% resolusi untuk meringankan GPU Mali-G52
-                setInitialScale(75) 
-
-                // 4. Minta WebView untuk tidak "tidur" (throttling) saat game berjalan
-                setRenderPriority(android.webkit.WebSettings.RenderPriority.HIGH)
+                
+                // 3. MATIKAN ZOOM agar koordinat sentuhan/aim akurat
+                setSupportZoom(false)
+                builtInZoomControls = false
+                displayZoomControls = false
+                
+                // 4. Biarkan game menyesuaikan rasionya sendiri
+                loadWithOverviewMode = true
+                useWideViewPort = true
             }
 
-            // 5. Kunci prioritas renderer ke level TERTINGGI agar tidak di-kill OS
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false)
             }
@@ -54,9 +63,25 @@ class MainActivity : AppCompatActivity() {
                     val url = request?.url ?: return null
                     return assetLoader.shouldInterceptRequest(url)
                 }
+
+                override fun onPageFinished(view: WebView?, url: String?) {
+                    super.onPageFinished(view, url)
+                    // 5. Suntikkan JS untuk memicu resize agar game menyesuaikan layar
+                    val js = """
+                        setTimeout(function() {
+                            window.dispatchEvent(new Event('resize'));
+                            if(document.documentElement) {
+                                document.documentElement.style.height = '100vh';
+                                document.body.style.height = '100vh';
+                                document.body.style.margin = '0';
+                                document.body.style.overflow = 'hidden';
+                            }
+                        }, 1000);
+                    """.trimIndent()
+                    view?.evaluateJavascript(js, null)
+                }
             }
 
-            // GANTI URL jika perlu. Pastikan game Anda mendukung WebGL.
             loadUrl("https://pbmobile.app")
         }
 
