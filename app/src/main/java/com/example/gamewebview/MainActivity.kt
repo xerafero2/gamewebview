@@ -41,7 +41,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             // GANTI URL INI dengan game 3D Anda
-            loadUrl("https://game-3d-anda.com")
+            loadUrl("https://pbmobile.app")
         }
 
         setContentView(webView)
