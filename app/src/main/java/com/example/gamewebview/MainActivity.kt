@@ -18,13 +18,26 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         val webView = WebView(this).apply {
+            // 1. Paksa akselerasi hardware paling dasar (lapisan GPU)
             setLayerType(View.LAYER_TYPE_HARDWARE, null)
+
             settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true
                 allowFileAccess = true
                 allowContentAccess = true
+
+                // 2. Matikan pembatasan zoom & viewport agar kita bisa atur resolusi
+                setUseWideViewPort(true)
+                setLoadWithOverviewMode(true)
+                // 3. Paksa render pada ~75% resolusi untuk meringankan GPU Mali-G52
+                setInitialScale(75) 
+
+                // 4. Minta WebView untuk tidak "tidur" (throttling) saat game berjalan
+                setRenderPriority(android.webkit.WebSettings.RenderPriority.HIGH)
             }
+
+            // 5. Kunci prioritas renderer ke level TERTINGGI agar tidak di-kill OS
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false)
             }
@@ -43,6 +56,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
+            // GANTI URL jika perlu. Pastikan game Anda mendukung WebGL.
             loadUrl("https://pbmobile.app")
         }
 
